@@ -3,4 +3,3 @@ transformers
 torch
 plotly
 pandas
-python-dotenv
