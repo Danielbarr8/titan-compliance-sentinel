@@ -1,5 +1,5 @@
 streamlit
-requests
-feedparser
-plotly
+huggingface_hub
 pandas
+plotly
+feedparser
