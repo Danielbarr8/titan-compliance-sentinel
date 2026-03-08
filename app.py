@@ -3,82 +3,57 @@ import pandas as pd
 import plotly.express as px
 from transformers import pipeline
 
-# --- ARCHITECT'S UI ---
-st.set_page_config(page_title="PROJECT TITAN", layout="wide", page_icon="🛡️")
+# --- TITAN SETTINGS ---
+st.set_page_config(page_title="PROJECT TITAN", layout="wide")
 
-st.markdown("""
-    <style>
-    .main { background-color: #0f172a; color: #f8fafc; }
-    .stTextArea textarea { background-color: #1e293b; color: white; border: 1px solid #334155; }
-    .stButton>button { background-image: linear-gradient(to right, #2563eb, #7c3aed); color: white; font-weight: bold; border: none; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- TOKEN CHECK ---
+# This looks for the key in your Streamlit Secrets 'locked box'
+try:
+    hf_token = st.secrets["HUGGINGFACE_TOKEN"]
+except:
+    st.error("🔑 ARCHITECT ERROR: No Hugging Face Token found in Streamlit Secrets!")
+    st.stop()
 
-# --- THE BRAIN (Zero-Shot AI Act Auditor) ---
+# --- THE BRAIN ---
 @st.cache_resource
 def load_auditor():
-    # Elite model for classifying risks without manual training
-    return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+    # We pass the token here to ensure the connection is authorized
+    return pipeline("zero-shot-classification", 
+                    model="facebook/bart-large-mnli", 
+                    token=hf_token)
 
 def run_audit(text):
-    classifier = load_auditor()
-    # Official Risk Tiers of the EU AI Act
-    risk_tiers = ["Unacceptable Risk", "High Risk", "Limited Risk", "Minimal Risk"]
-    results = classifier(text, risk_tiers)
-    return {"label": results['labels'][0], "score": results['scores'][0]}
+    try:
+        classifier = load_auditor()
+        risk_tiers = ["Unacceptable Risk", "High Risk", "Limited Risk", "Minimal Risk"]
+        results = classifier(text, risk_tiers)
+        return {"label": results['labels'][0], "score": results['scores'][0]}
+    except Exception as e:
+        return {"error": str(e)}
 
-# --- MAIN DASHBOARD ---
+# --- UI DESIGN ---
 st.title("🛡️ PROJECT TITAN")
-st.write("### AI Compliance Architect & Regulatory Sentinel")
+st.write("### AI Compliance Architect | Operational")
 st.divider()
 
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    st.subheader("🛠️ Project Submission")
-    project_desc = st.text_area("Describe the AI Model's purpose and data usage:", height=300, 
-                                placeholder="Example: A credit scoring AI that uses social media data to determine loan eligibility...")
-    
-    audit_btn = st.button("⚖️ INITIATE TITAN AUDIT")
-
-with col2:
-    if audit_btn and project_desc:
-        with st.spinner("TITAN is mapping neural patterns to EU AI Act regulations..."):
+project_desc = st.text_area("Enter AI Project Description:", height=200)
+if st.button("RUN SENTINEL AUDIT"):
+    if project_desc:
+        with st.spinner("Analyzing neural pathways..."):
             audit = run_audit(project_desc)
-            risk_label = audit['label']
-            confidence = audit['score']
-
-            # Visualization: Risk Radar
-            st.subheader("🔍 Compliance Risk Profile")
-            risk_map = pd.DataFrame({
-                "Regulation": ["Bias Detection", "Data Privacy", "Transparency", "Safety"],
-                "Risk Level": [confidence, 0.75, 0.40, 1-confidence]
-            })
-            fig = px.line_polar(risk_map, r='Risk Level', theta='Regulation', line_close=True, 
-                               template="plotly_dark", color_discrete_sequence=['#7c3aed'])
-            st.plotly_chart(fig)
-
-            # Sentinel Verdict
-            if "Unacceptable" in risk_label:
-                st.error(f"VERDICT: {risk_label} (Immediate Action Required)")
-            elif "High" in risk_label:
-                st.warning(f"VERDICT: {risk_label} (Requires Human Oversight)")
+            
+            if "error" in audit:
+                st.error(f"TITAN OFFLINE: {audit['error']}")
             else:
-                st.success(f"VERDICT: {risk_label} (Compliant)")
-
-# --- LINKEDIN SHAREABLE ---
-if audit_btn and project_desc:
-    st.divider()
-    st.subheader("🚀 LINKEDIN TRUST CERTIFICATE")
-    st.info("Copy the text below to showcase your Architect status on LinkedIn:")
-    st.code(f"""
-    I just deployed PROJECT TITAN: An AI Compliance Architect. 🛡️
-    
-    Audit Subject: {project_desc[:40]}...
-    EU AI Act Verdict: {risk_label}
-    Sentinel Confidence: {confidence*100:.1f}%
-    
-    Bridging the gap between raw code and global regulation. 
-    Built with #Streamlit #HuggingFace #GitHub #Python
-    #AICompliance #ProjectTITAN #AIGovernance
-    """, language="text")
+                label = audit['label']
+                score = audit['score']
+                
+                # Visual Risk Radar
+                df = pd.DataFrame({
+                    "Category": ["Regulatory Bias", "Data Ethics", "Safety", "Transparency"],
+                    "Value": [score, 0.70, 0.85, 1-score]
+                })
+                fig = px.line_polar(df, r='Value', theta='Category', line_close=True)
+                st.plotly_chart(fig)
+                
+                st.success(f"VERDICT: {label} ({score*100:.1f}% Confidence)")
