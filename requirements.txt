@@ -1,7 +1,5 @@
 streamlit
-transformers
-torch
-plotly
-pandas
 requests
 feedparser
+plotly
+pandas
