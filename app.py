@@ -6,10 +6,10 @@ import feedparser
 from datetime import datetime
 import time
 
-# --- TITAN SENTINEL v4.0 ---
+# --- TITAN MASTER ARCHITECT UI ---
 st.set_page_config(page_title="PROJECT TITAN", layout="wide", page_icon="🛡️")
 
-# NEON ARCHITECT UI
+# CUSTOM NEON CSS
 st.markdown("""
     <style>
     .main { background-color: #000814; color: #00f2ff; }
@@ -17,40 +17,39 @@ st.markdown("""
     .stButton>button { 
         background-image: linear-gradient(to right, #003566, #00f2ff); 
         color: white; font-weight: bold; border: none; box-shadow: 0px 0px 15px #00f2ff;
-        width: 100%;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# API ROUTING (2026 PROTOCOL)
-# We use the new Router gateway which is more stable than the old Inference API
+# --- API CONFIG ---
 try:
     hf_token = st.secrets["HUGGINGFACE_TOKEN"]
 except:
-    st.error("🔑 ARCHITECT ERROR: Token not found in Streamlit Secrets!")
+    st.error("🔑 ARCHITECT ERROR: Token not found!")
     st.stop()
 
-# Updated Endpoints for 2026
-RISK_MODEL = "https://router.huggingface.co/models/facebook/bart-large-mnli"
-BIAS_MODEL = "https://router.huggingface.co/models/unitary/toxic-bert"
+# Using standard Inference API for maximum stability in 2026
+RISK_MODEL = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli"
+BIAS_MODEL = "https://api-inference.huggingface.co/models/unitary/toxic-bert"
 headers = {"Authorization": f"Bearer {hf_token}"}
 
 def titan_call(url, payload):
-    # Retry loop: If the model is 'cold', we wait and try again automatically
+    """Safely calls the AI brain and handles errors without crashing."""
     for i in range(3):
-        response = requests.post(url, headers=headers, json=payload)
-        data = response.json()
-        if "error" in data and "loading" in str(data.get("error")):
-            time.sleep(10) # Wait 10 seconds for the 'Brain' to wake up
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            # If the server is busy, it returns a 503 or 404. We catch that here.
+            if response.status_code != 200:
+                st.warning(f"📡 Sentinel Link Weak... Retrying in {10}s (Attempt {i+1}/3)")
+                time.sleep(10)
+                continue
+            return response.json()
+        except Exception:
+            time.sleep(5)
             continue
-        return data
-    return {"error": "Sentinel Timeout: AI Brain is deep in sleep. Try once more."}
+    return {"error": "Connection Timeout. The Hugging Face server is currently overloaded. Please wait 30 seconds and try again."}
 
-# --- INTERFACE ---
-st.title("🛡️ PROJECT TITAN")
-st.write(f"### STATUS: ONLINE | ARCHITECT: Daniel Barr")
-st.divider()
-
+# --- SIDEBAR FEED ---
 with st.sidebar:
     st.markdown("### 📡 SATELLITE FEED")
     feed = feedparser.parse("https://www.technologyreview.com/topic/artificial-intelligence/feed/")
@@ -59,22 +58,26 @@ with st.sidebar:
         st.caption(f"🗓️ {entry.published[:16]}")
         st.divider()
 
-desc = st.text_area("Input AI Project Parameters:", height=180, placeholder="Describe the AI system...")
+# --- MAIN DASHBOARD ---
+st.title("🛡️ PROJECT TITAN")
+st.write(f"### STATUS: OPERATIONAL | ARCHITECT: Daniel Barr")
+st.divider()
+
+desc = st.text_area("Input AI Project Parameters for Deep Audit:", height=180)
 
 if st.button("EXECUTE MASTER AUDIT"):
     if desc:
-        with st.spinner("Synchronizing Neural Sentinels via Global Router..."):
+        with st.spinner("Synchronizing Neural Sentinels..."):
             risk_data = titan_call(RISK_MODEL, {"inputs": desc, "parameters": {"candidate_labels": ["Unacceptable Risk", "High Risk", "Limited Risk", "Minimal Risk"]}})
             bias_data = titan_call(BIAS_MODEL, {"inputs": desc})
 
-            if "error" in risk_data:
-                st.warning(risk_data["error"])
-            else:
-                col1, col2 = st.columns(2)
+            # Check if we got valid data back
+            if isinstance(risk_data, dict) and "error" not in risk_data:
                 label = risk_data['labels'][0]
                 risk_score = risk_data['scores'][0]
                 bias_score = bias_data[0][0]['score']
 
+                col1, col2 = st.columns(2)
                 with col1:
                     st.subheader("⚖️ Regulatory Verdict")
                     st.metric("Risk Level", label)
@@ -87,3 +90,5 @@ if st.button("EXECUTE MASTER AUDIT"):
                     st.info(f"VERDICT: {label} | BIAS: {bias_score:.2%}")
                     if bias_score > 0.5: st.error("🚨 HIGH BIAS PROBABILITY")
                     else: st.success("✅ COMPLIANCE CLEARANCE")
+            else:
+                st.error("🚨 TITAN OFFLINE: The AI server is not responding correctly. Check your token or try again later.")
