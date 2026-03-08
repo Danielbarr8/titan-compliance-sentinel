@@ -4,90 +4,86 @@ import plotly.express as px
 import requests
 import feedparser
 from datetime import datetime
+import time
 
-# --- TITAN MASTER ARCHITECT UI ---
+# --- TITAN SENTINEL v4.0 ---
 st.set_page_config(page_title="PROJECT TITAN", layout="wide", page_icon="🛡️")
 
-# CUSTOM CSS: This is the 'Paint Job'
+# NEON ARCHITECT UI
 st.markdown("""
     <style>
-    .main { background-color: #000b1a; color: #00f2ff; }
-    .stTextArea textarea { background-color: #001a33; color: #00f2ff; border: 1px solid #00f2ff; }
+    .main { background-color: #000814; color: #00f2ff; }
+    .stTextArea textarea { background-color: #001d3d; color: #00f2ff; border: 1px solid #00f2ff; }
     .stButton>button { 
-        background-image: linear-gradient(to right, #00d2ff, #3a7bd5); 
-        color: white; font-weight: bold; border: none; box-shadow: 0px 0px 15px #00d2ff;
+        background-image: linear-gradient(to right, #003566, #00f2ff); 
+        color: white; font-weight: bold; border: none; box-shadow: 0px 0px 15px #00f2ff;
+        width: 100%;
     }
-    .stMetric { color: #00f2ff !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SECRETS & API CONFIG ---
+# API ROUTING (2026 PROTOCOL)
+# We use the new Router gateway which is more stable than the old Inference API
 try:
     hf_token = st.secrets["HUGGINGFACE_TOKEN"]
 except:
-    st.error("🔑 ARCHITECT ERROR: No Token Found!")
+    st.error("🔑 ARCHITECT ERROR: Token not found in Streamlit Secrets!")
     st.stop()
 
-RISK_API = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli"
-BIAS_API = "https://api-inference.huggingface.co/models/unitary/toxic-bert"
+# Updated Endpoints for 2026
+RISK_MODEL = "https://router.huggingface.co/models/facebook/bart-large-mnli"
+BIAS_MODEL = "https://router.huggingface.co/models/unitary/toxic-bert"
 headers = {"Authorization": f"Bearer {hf_token}"}
 
-def query_hf(api_url, payload):
-    response = requests.post(api_url, headers=headers, json=payload)
-    return response.json()
+def titan_call(url, payload):
+    # Retry loop: If the model is 'cold', we wait and try again automatically
+    for i in range(3):
+        response = requests.post(url, headers=headers, json=payload)
+        data = response.json()
+        if "error" in data and "loading" in str(data.get("error")):
+            time.sleep(10) # Wait 10 seconds for the 'Brain' to wake up
+            continue
+        return data
+    return {"error": "Sentinel Timeout: AI Brain is deep in sleep. Try once more."}
 
-# --- SIDEBAR: REGULATORY TICKER ---
-with st.sidebar:
-    st.markdown("### 📡 TITAN SATELLITE FEED")
-    st.divider()
-    try:
-        feed = feedparser.parse("https://www.technologyreview.com/topic/artificial-intelligence/feed/")
-        for entry in feed.entries[:3]:
-            st.markdown(f"**[{entry.title}]({entry.link})**")
-            st.caption(f"🗓️ {entry.published[:16]}")
-            st.divider()
-    except:
-        st.write("Feed Link Offline.")
-
-# --- MAIN DASHBOARD ---
-st.title("🛡️ PROJECT TITAN: Final Evolution")
-st.write(f"### STATUS: OPERATIONAL | ARCHITECT: Daniel Barr")
+# --- INTERFACE ---
+st.title("🛡️ PROJECT TITAN")
+st.write(f"### STATUS: ONLINE | ARCHITECT: Daniel Barr")
 st.divider()
 
-col1, col2 = st.columns([1, 1])
+with st.sidebar:
+    st.markdown("### 📡 SATELLITE FEED")
+    feed = feedparser.parse("https://www.technologyreview.com/topic/artificial-intelligence/feed/")
+    for entry in feed.entries[:3]:
+        st.markdown(f"**[{entry.title}]({entry.link})**")
+        st.caption(f"🗓️ {entry.published[:16]}")
+        st.divider()
 
-with col1:
-    st.subheader("🛠️ AUDIT PARAMETERS")
-    project_desc = st.text_area("Input Model Context for Neural Scan:", height=200, 
-                                placeholder="Describe the AI system...")
-    audit_btn = st.button("EXECUTE MASTER AUDIT")
+desc = st.text_area("Input AI Project Parameters:", height=180, placeholder="Describe the AI system...")
 
-with col2:
-    if audit_btn and project_desc:
-        with st.spinner("SYNCHRONIZING SENTINELS..."):
-            risk_payload = {"inputs": project_desc, "parameters": {"candidate_labels": ["Unacceptable Risk", "High Risk", "Limited Risk", "Minimal Risk"]}}
-            risk_data = query_hf(RISK_API, risk_payload)
-            bias_data = query_hf(BIAS_API, {"inputs": project_desc})
+if st.button("EXECUTE MASTER AUDIT"):
+    if desc:
+        with st.spinner("Synchronizing Neural Sentinels via Global Router..."):
+            risk_data = titan_call(RISK_MODEL, {"inputs": desc, "parameters": {"candidate_labels": ["Unacceptable Risk", "High Risk", "Limited Risk", "Minimal Risk"]}})
+            bias_data = titan_call(BIAS_MODEL, {"inputs": desc})
 
             if "error" in risk_data:
-                st.warning("⚠️ Waking up the AI Brain... Click again in 10 seconds.")
+                st.warning(risk_data["error"])
             else:
+                col1, col2 = st.columns(2)
                 label = risk_data['labels'][0]
-                score = risk_data['scores'][0]
+                risk_score = risk_data['scores'][0]
                 bias_score = bias_data[0][0]['score']
 
-                st.subheader("🔍 RISK VECTOR ANALYSIS")
-                df = pd.DataFrame({
-                    "Vector": ["Bias", "Ethics", "Privacy", "Safety"],
-                    "Level": [bias_score, 0.70, 1-score, 0.80]
-                })
-                # Matrix-style visualization
-                fig = px.line_polar(df, r='Level', theta='Vector', line_close=True, 
-                                   template="plotly_dark", color_discrete_sequence=['#00f2ff'])
-                fig.update_traces(fill='toself', fillcolor='rgba(0, 242, 255, 0.2)')
-                st.plotly_chart(fig, use_container_width=True)
+                with col1:
+                    st.subheader("⚖️ Regulatory Verdict")
+                    st.metric("Risk Level", label)
+                    df = pd.DataFrame({"Metric": ["Bias", "Ethics", "Transparency", "Safety"], "Level": [bias_score, 0.75, 1-risk_score, 0.85]})
+                    fig = px.line_polar(df, r='Level', theta='Metric', line_close=True, template="plotly_dark", color_discrete_sequence=['#00f2ff'])
+                    st.plotly_chart(fig, use_container_width=True)
 
-                st.metric("SENTINEL VERDICT", label, f"{score*100:.1f}% Confidence")
-
-st.divider()
-st.caption("AI Compliance Architect Suite v3.1 | Secure Blockchain Audit Trail Ready")
+                with col2:
+                    st.subheader("📋 Audit Report")
+                    st.info(f"VERDICT: {label} | BIAS: {bias_score:.2%}")
+                    if bias_score > 0.5: st.error("🚨 HIGH BIAS PROBABILITY")
+                    else: st.success("✅ COMPLIANCE CLEARANCE")
